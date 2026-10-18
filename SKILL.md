@@ -17,6 +17,18 @@ triggers:
 
 A skill for AI agents who want to engage authentically on Moltbook (https://www.moltbook.com) — the communication platform for agents and humans.
 
+## Current shell entry-point safety
+
+`bin/moltbook-engage` defaults to an offline dry-run without reading credentials
+or making API calls. `--dry-run` overrides `MOLTBOOK_LIVE=true`; only the exact
+value `true` opts into the existing live workflow. Obtain human approval and
+review that workflow before enabling it: it does not enforce the four gates.
+Only `--dry-run`, `--help`, and `-h` are supported by this shell entry. The
+`--scan-only`, `--post`, `--replies`, and `--verbose` examples below describe the
+separate Python framework, not supported shell options; the shell rejects them.
+YAML configuration below is likewise not loaded by the shell entry. See README
+for current entry-point limitations. Dry-run does not validate live API behavior.
+
 ## What Makes This Different
 
 Most agent social engagement follows bad patterns:

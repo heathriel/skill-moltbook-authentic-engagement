@@ -1,6 +1,31 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
+# Parse safety options before reading credentials or contacting the service.
+DRY_RUN=false
+SHOW_HELP=false
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=true ;;
+    --help|-h) SHOW_HELP=true ;;
+    *) printf 'Unsupported option: %s\n' "$arg" >&2; exit 2 ;;
+  esac
+done
+
+if [[ "$SHOW_HELP" == "true" ]]; then
+  echo "Usage: moltbook-engage [--dry-run] [--help]"
+  echo "Default: offline dry-run. No credentials are read and no API calls are made."
+  echo "MOLTBOOK_LIVE=true opts into the existing live workflow; --dry-run overrides it."
+  echo "Review the live workflow and obtain approval before enabling it."
+  exit 0
+fi
+
+if [[ "$DRY_RUN" == "true" || "${MOLTBOOK_LIVE:-false}" != "true" ]]; then
+  echo "[DRY-RUN] Offline mode: no credentials read or API calls made."
+  echo "No feed was scanned and no engagement actions were performed."
+  exit 0
+fi
+
 # Simple Moltbook Engagement - Post + Upvote + Comment
 API_BASE="https://www.moltbook.com/api/v1"
 API_KEY=$(jq -r .api_key ~/.config/moltbook/credentials.json)
@@ -27,38 +52,24 @@ my_id=$(echo "$me" | jq -r '.agent.id // .id')
 my_name=$(echo "$me" | jq -r '.agent.name // "BobRenze"')
 echo "Agent: $my_name ($my_id)"
 
-# Check for soft suspension (can read but not post)
-# Try a test post attempt (dry-run check)
-test_payload='{"title":"test","content":"test","submolt":"general"}'
-test_response=$(curl -s -X POST "${API_BASE}/posts" "${AUTH[@]}" -d "$test_payload" 2>&1 || true)
-if echo "$test_response" | grep -qi "suspended"; then
-  echo "❌ POSTING SUSPENDED: Account restricted from posting"
-  echo "Will skip posting but may engage with upvotes/comments if allowed."
-  POSTING_SUSPENDED=true
-else
-  POSTING_SUSPENDED=false
-fi
+# Do not probe posting permissions with a real POST: that publishes content.
+# Suspension status is checked only through the read-only /agents/me request above.
 
 # === PART 1: POST from topic queue ===
 echo ""
 echo "--- Checking if should post ---"
 
-# Skip posting if suspended
-if [[ "$POSTING_SUSPENDED" == "true" ]]; then
-  echo "⏭️  SKIPPING: Posting suspended, checking only engagement..."
-else
-  # Check last post time
-  my_posts=$(curl -s "${API_BASE}/posts?author_id=${my_id}&sort=new&limit=1" -H "Authorization: Bearer ${API_KEY}")
-  last_post=$(echo "$my_posts" | jq -r '.posts[0]?')
+# Read recent posts; this section does not publish from the topic queue.
+my_posts=$(curl -s "${API_BASE}/posts?author_id=${my_id}&sort=new&limit=1" -H "Authorization: Bearer ${API_KEY}")
+last_post=$(echo "$my_posts" | jq -r '.posts[0]?')
 
-  if [[ "$last_post" != "null" && -n "$last_post" ]]; then
-    last_title=$(echo "$last_post" | jq -r '.title')
-    last_time=$(echo "$last_post" | jq -r '.created_at')
-    echo "Last post: '$last_title' at $last_time"
-    echo "Not posting (already posted recently)"
-  else
-    echo "No recent posts - could post from queue"
-  fi
+if [[ "$last_post" != "null" && -n "$last_post" ]]; then
+  last_title=$(echo "$last_post" | jq -r '.title')
+  last_time=$(echo "$last_post" | jq -r '.created_at')
+  echo "Last post: '$last_title' at $last_time"
+  echo "Not posting (already posted recently)"
+else
+  echo "No recent posts - could post from queue"
 fi
 
 # === PART 2: ENGAGE with community ===

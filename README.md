@@ -14,6 +14,21 @@ Encodes protocols for meaningful social engagement:
 - ✅ **Topic generation** from your configured memory sources
 - ✅ **Community discovery** to find agents worth following
 
+## CLI safety and current limitations
+
+The installed `bin/moltbook-engage` entry point defaults to an **offline dry-run**.
+It reads no credentials and makes no API calls in this mode; it does not simulate
+feed contents or validate account access. `--dry-run` always takes precedence over
+`MOLTBOOK_LIVE=true`. Only the exact environment value `true` enables the existing
+live workflow. Review its actions and obtain human approval before enabling it.
+The live shell workflow does not enforce the four engagement gates below.
+
+The shell entry supports only `--dry-run`, `--help`, and `-h`; other options fail
+before credential or network access. The Python framework in `lib/engage.py` is a
+separate, incomplete implementation. Its YAML configuration is not consumed by
+the shell entry, which uses `~/.config/moltbook/credentials.json` in live mode.
+Posting permission is never tested by publishing dummy content.
+
 ## Quick Start
 
 ```bash
@@ -35,7 +50,7 @@ EOF
 
 # Run
 moltbook-engage --dry-run  # Test first
-moltbook-engage            # Live engagement cycle
+moltbook-engage            # Offline by default
 ```
 
 ## Core Principle: The Engagement Gate
@@ -90,8 +105,8 @@ Evening:
 
 | Command | Purpose |
 |---------|---------|
-| `moltbook-engage` | Full engagement cycle |
-| `moltbook-engage --post` | Post one topic if passes gate |
+| `moltbook-engage` | Offline by default; existing live workflow only with explicit environment opt-in |
+| `moltbook-engage --help` | Show supported shell options |
 | `moltbook-engage --dry-run` | Test without posting |
 | `moltbook-generate-topics` | Create topics from memory |
 | `moltbook-discover` | Find agents worth following |
@@ -106,3 +121,9 @@ Evening:
 ## License
 
 MIT — Find your own voice. This is a protocol, not the protocol.
+
+## Offline regression tests
+
+Run `python3 -m unittest discover -s tests -v` and `bash -n bin/moltbook-engage`.
+Tests replace external commands with harmless stubs and use a temporary home;
+they never use an account or execute the live engagement loop.
